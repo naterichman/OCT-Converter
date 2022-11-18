@@ -6,7 +6,7 @@ import numpy as np
 from oct_converter.image_types import OCTVolumeWithMetaData
 
 
-class ZEISSDCM(object):
+class ZEISSDicom(object):
     """Class for extracting data from Zeiss's .dcm file format.
 
     Attributes:
