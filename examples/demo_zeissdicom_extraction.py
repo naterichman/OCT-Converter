@@ -1,6 +1,6 @@
 from oct_converter.readers import ZEISSDicom
 
-filepath = ("../sample_files/sample_zeissdcm.dcm")
+filepath = "../sample_files/sample_zeissdcm.dcm"
 img = ZEISSDicom(filepath)
 
 oct_volumes = (
