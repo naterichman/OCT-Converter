@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from oct_converter.image_types import OCTVolumeWithMetaData
 
 
-class ZEISSDICOM(object):
+class ZEISSDCM(object):
     """Class for extracting data from Zeiss's .dcm file format.
 
     Attributes:
@@ -31,22 +31,28 @@ class ZEISSDICOM(object):
                 print(f'Found {num_frames} frames')
                 for frame in data_element:
                     scrambled_frame=frame[0x0407, 0x1006]
-                    unscrambled_frame = self.unscramble_czm(scrambled_frame)
+                    unscrambled_frame = self.unscramble_frame(scrambled_frame)
                     frame = cv2.imdecode(np.frombuffer(unscrambled_frame, np.uint8), flags=1)
                     volume.append(frame[:,:,0]) # is grayscale so we take the first channel
                 all_oct_volumes.append(volume)
         ds = pydicom.dcmread(self.filepath)
+        if not ds.Manufacturer.startswith("Carl Zeiss Meditec"):
+            raise ValueError("This does not appear to be a Zeiss DCM. You may need to read with the DCM class.")
         all_oct_volumes = []
         ds.walk(find_oct_tags)
 
         all_volumes_out = []
         for volume in all_oct_volumes:
             array = np.rot90(np.array(volume),axes=(1, 2),k=3)
-            # if interlaced:
-            #     shape = array.shape
-            #     interlaced = np.zeros((int(shape[0] / 2), shape[1], shape[2] * 2))
-            #     interlaced[..., 0::2] = volume[:512, ...]
-            #     interlaced[..., 1::2] = volume[512:, ...]
+            if interlaced:
+                shape = array.shape
+                for slice in range(array.shape[0]):
+                    interlaced = np.zeros((int(shape[1] / 2), shape[2] * 2))
+                    interlaced[0::2,:] = array[slice,:512, ...]
+                    interlaced[1::2,:] = array[slice,512:, ...]
+                    import matplotlib.pyplot as plt
+                    plt.imshow(interlaced)
+                    plt.show()
             all_volumes_out.append(
                 OCTVolumeWithMetaData(
                     volume=array
@@ -55,18 +61,15 @@ class ZEISSDICOM(object):
         return all_volumes_out
 
 
-    def unscramble_czm(self, frame: bytes) -> bytearray:
-        """Return an unscrambled image frame.
+    def unscramble_frame(self, frame: bytes) -> bytearray:
+        """Return an unscrambled image frame. Thanks to https://github.com/scaramallion for the code,
+         as detailed in https://github.com/pydicom/pydicom/discussions/1618.
 
-        Parameters
-        ----------
-        frame : bytes
-            The scrambled CZM JPEG 2000 data frame as found in the DICOM dataset.
+        Args
+        frame (bytes): The scrambled CZM JPEG 2000 data frame as found in the DICOM dataset.
 
         Returns
-        -------
-        bytearray
-            The unscrambled JPEG 2000 data.
+        bytearray: The unscrambled JPEG 2000 data.
         """
         # Fix the 0x5A XORing
         frame = bytearray(frame)
