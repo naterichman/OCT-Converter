@@ -3,7 +3,6 @@ import math
 import pydicom
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from oct_converter.image_types import OCTVolumeWithMetaData
 
 
@@ -19,7 +18,7 @@ class ZEISSDCM(object):
         if not self.filepath.exists():
             raise FileNotFoundError(self.filepath)
 
-    def read_oct_volume(self, interlaced=False):
+    def read_oct_volume(self):
         """Reads OCT data.
 
         """
@@ -44,18 +43,15 @@ class ZEISSDCM(object):
         all_volumes_out = []
         for volume in all_oct_volumes:
             array = np.rot90(np.array(volume),axes=(1, 2),k=3)
-            if interlaced:
-                shape = array.shape
-                for slice in range(array.shape[0]):
-                    interlaced = np.zeros((int(shape[1] / 2), shape[2] * 2))
-                    interlaced[0::2,:] = array[slice,:512, ...]
-                    interlaced[1::2,:] = array[slice,512:, ...]
-                    import matplotlib.pyplot as plt
-                    plt.imshow(interlaced)
-                    plt.show()
             all_volumes_out.append(
                 OCTVolumeWithMetaData(
-                    volume=array
+                    volume=array,
+                    patient_id=ds.PatientID,
+                    first_name=str(ds.PatientName).split('^')[1],
+                    surname=str(ds.PatientName).split('^')[0],
+                    sex=ds.PatientSex,
+                    acquisition_date=ds.StudyDate,
+                    laterality=ds.Laterality,
                 )
             )
         return all_volumes_out
