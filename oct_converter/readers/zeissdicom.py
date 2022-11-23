@@ -4,8 +4,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pydicom
+from pydicom.encaps import generate_pixel_data_frame
 
-from oct_converter.image_types import OCTVolumeWithMetaData
+from oct_converter.image_types import FundusImageWithMetaData, OCTVolumeWithMetaData
 
 
 class ZEISSDicom(object):
@@ -20,37 +21,45 @@ class ZEISSDicom(object):
         if not self.filepath.exists():
             raise FileNotFoundError(self.filepath)
 
-    def read_oct_volume(self):
-        """Reads OCT data."""
+    def find_oct_tags(self, dataset, data_element):
+        if data_element.tag == (0x0407, 0x1005):
+            num_frames = len(data_element.value)
+            volume = []
+            print(f"Found {num_frames} frames")
+            for frame in data_element:
+                scrambled_frame = frame[0x0407, 0x1006]
+                unscrambled_frame = self.unscramble_frame(scrambled_frame)
+                frame = cv2.imdecode(
+                    np.frombuffer(unscrambled_frame, np.uint8), flags=1
+                )
+                if num_frames == 1:
+                    volume = frame
+                else:
+                    # is grayscale so we take the first channel
+                    volume.append(frame[:, :, 0])
+            if num_frames == 1:
+                self.all_fundus.append(volume)
+            else:
+                self.all_oct.append(volume)
 
-        def find_oct_tags(dataset, data_element):
-            if data_element.tag == (0x0407, 0x1005):
-                num_frames = len(data_element.value)
-                volume = []
-                print(f"Found {num_frames} frames")
-                for frame in data_element:
-                    scrambled_frame = frame[0x0407, 0x1006]
-                    unscrambled_frame = self.unscramble_frame(scrambled_frame)
-                    frame = cv2.imdecode(
-                        np.frombuffer(unscrambled_frame, np.uint8), flags=1
-                    )
-                    volume.append(
-                        frame[:, :, 0]
-                    )  # is grayscale so we take the first channel
-                all_oct_volumes.append(volume)
-
+    def read_data(self):
+        """Reads OCT and fundus data."""
         ds = pydicom.dcmread(self.filepath)
         if not ds.Manufacturer.startswith("Carl Zeiss Meditec"):
             raise ValueError(
                 "This does not appear to be a Zeiss DCM. You may need to read with the DCM class."
             )
-        all_oct_volumes = []
-        ds.walk(find_oct_tags)
 
-        all_volumes_out = []
-        for volume in all_oct_volumes:
+        self.all_oct = []
+        self.all_fundus = []
+        all_oct_out = []
+        all_fundus_out = []
+
+        # pass 1
+        ds.walk(self.find_oct_tags)
+        for volume in self.all_oct:
             array = np.rot90(np.array(volume), axes=(1, 2), k=3)
-            all_volumes_out.append(
+            all_oct_out.append(
                 OCTVolumeWithMetaData(
                     volume=array,
                     patient_id=ds.PatientID,
@@ -61,7 +70,57 @@ class ZEISSDicom(object):
                     laterality=ds.Laterality,
                 )
             )
-        return all_volumes_out
+        for image in self.all_fundus:
+            all_fundus_out.append(
+                FundusImageWithMetaData(
+                    image=image,
+                    patient_id=ds.PatientID,
+                    laterality=ds.Laterality,
+                )
+            )
+
+        # pass 2
+        if "PixelData" in ds:
+            if "NumberOfFrames" in ds:
+                if isinstance(ds.NumberOfFrames, str):
+                    nr_frames = ds.NumberOfFrames.split("\0")[0]
+                else:
+                    nr_frames = ds.NumberOfFrames
+
+                frames = generate_pixel_data_frame(ds.PixelData, int(nr_frames))
+                all_frames = []
+                for idx, scrambled_frame in enumerate(frames):
+                    unscrambled_frame = self.unscramble_frame(scrambled_frame)
+                    frame = cv2.imdecode(
+                        np.frombuffer(unscrambled_frame, np.uint8), flags=1
+                    )
+                    all_frames.append(frame)
+                array = np.rot90(np.array(all_frames), axes=(1, 2), k=3)
+                all_oct_out.append(
+                    OCTVolumeWithMetaData(
+                        volume=array,
+                        patient_id=ds.PatientID,
+                        first_name=str(ds.PatientName).split("^")[1],
+                        surname=str(ds.PatientName).split("^")[0],
+                        sex=ds.PatientSex,
+                        acquisition_date=ds.StudyDate,
+                        laterality=ds.Laterality,
+                    )
+                )
+            else:
+                unscrambled_frame = self.unscramble_frame(ds.PixelData)
+                frame = cv2.imdecode(
+                    np.frombuffer(unscrambled_frame, np.uint8), flags=1
+                )
+                all_fundus_out.append(
+                    FundusImageWithMetaData(
+                        image=frame,
+                        patient_id=ds.PatientID,
+                        laterality=ds.Laterality,
+                    )
+                )
+
+        return all_oct_out, all_fundus_out
 
     def unscramble_frame(self, frame: bytes) -> bytearray:
         """Return an unscrambled image frame. Thanks to https://github.com/scaramallion for the code,
