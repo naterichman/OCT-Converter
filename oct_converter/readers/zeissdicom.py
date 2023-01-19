@@ -90,10 +90,16 @@ class ZEISSDicom(object):
                 frames = generate_pixel_data_frame(ds.PixelData, int(nr_frames))
                 all_frames = []
                 for idx, scrambled_frame in enumerate(frames):
-                    unscrambled_frame = self.unscramble_frame(scrambled_frame)
+                    # try decoding without unscrambling
                     frame = cv2.imdecode(
-                        np.frombuffer(unscrambled_frame, np.uint8), flags=1
+                        np.frombuffer(scrambled_frame, np.uint8), flags=1
                     )
+                    # if that fails, unscramble and decode
+                    if frame is None:
+                        unscrambled_frame = self.unscramble_frame(scrambled_frame)
+                        frame = cv2.imdecode(
+                            np.frombuffer(unscrambled_frame, np.uint8), flags=1
+                        )
                     all_frames.append(frame)
                 array = np.rot90(np.array(all_frames), axes=(1, 2), k=3)
                 all_oct_out.append(
