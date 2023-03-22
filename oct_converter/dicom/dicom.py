@@ -1,5 +1,6 @@
 from pydicom.dataset import FileDataset, FileMetaDataset, Dataset
 from pydicom.uid import generate_uid, OphthalmicTomographyImageStorage, ExplicitVRLittleEndian
+from pydicom.encaps import encapsulate
 from oct_converter.dicom import implementation_uid
 import numpy as np
 from oct_converter.dicom.metadata import DicomMetadata
@@ -133,6 +134,9 @@ def write_opt_dicom(
 	ds.BitsAllocated = 16
 	ds.BitsStored = ds.BitsAllocated
 	ds.HighBit = ds.BitsAllocated - 1
+	ds.SamplesPerPixel = 1
+	ds.NumberOfFrames = len(frames)
+
 
 	# Multi-frame Functional Groups Module PS3.3 C.7.6.16
 	dt = datetime.now()
@@ -142,9 +146,11 @@ def write_opt_dicom(
 	ds.InstanceNumber = 1
 
 	per_frame = []
-	raw_pixel_data = bytes()
+	pixel_data_bytes = list()
 	# Convert to a 3d volume
 	pixel_data = np.array(frames).astype(np.uint16)
+	ds.Rows = pixel_data.shape[2]
+	ds.Columns = pixel_data.shape[1]
 	for i in range(pixel_data.shape[0]):
 		# Per Frame Functional Groups
 		frame_fgs = Dataset()
@@ -157,9 +163,9 @@ def write_opt_dicom(
 
 		# Pixel data
 		frame_dat = pixel_data[i, :, :]
-		raw_pixel_data += frame_dat.tobytes()
+		pixel_data_bytes.append(frame_dat.tobytes())
 		per_frame.append(frame_fgs)
 	ds.PerFrameFunctionalGroupsSequence = per_frame
-	ds.PixelData = raw_pixel_data
+	ds.PixelData = pixel_data.tobytes()
 	ds.save_as(file_)
 	return file_
