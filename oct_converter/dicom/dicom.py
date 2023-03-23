@@ -104,12 +104,6 @@ def opt_shared_functional_groups(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	return ds
 
 
-def rescale_data(data: np.ndarray):
-	max_v = np.max(data)
-	min_v = np.min(data)
-
-
-
 def write_opt_dicom(
 	meta: DicomMetadata,
 	frames: t.List[np.ndarray]
@@ -129,6 +123,7 @@ def write_opt_dicom(
 	ds.AcquisitionDateTime = meta.acquisition_date.strftime('%Y%m%d%H%M%S.%f')
 	ds.AcquisitionNumber = 1
 	ds.PhotometricInterpretation = 'MONOCHROME2'
+	# Unsigned integer
 	ds.PixelRepresentation = 0
 	# Use 16 bit pixel
 	ds.BitsAllocated = 16
@@ -149,8 +144,8 @@ def write_opt_dicom(
 	pixel_data_bytes = list()
 	# Convert to a 3d volume
 	pixel_data = np.array(frames).astype(np.uint16)
-	ds.Rows = pixel_data.shape[2]
-	ds.Columns = pixel_data.shape[1]
+	ds.Rows = pixel_data.shape[1]
+	ds.Columns = pixel_data.shape[2]
 	for i in range(pixel_data.shape[0]):
 		# Per Frame Functional Groups
 		frame_fgs = Dataset()
