@@ -1,4 +1,4 @@
-from construct import Int32un, PaddedString, Struct
+from construct import Int32un, PaddedString, Struct, Array, Float64n
 
 header = Struct(
     "FOCT" / PaddedString(4, "ascii"),
@@ -22,4 +22,12 @@ fundus_header = Struct(
     "number_slices" / Int32un,
     "unknown" / PaddedString(1, "ascii"),
     "size" / Int32un,
+)
+
+# ref: https://github.com/neurodial/LibOctData/blob/master/octdata/import/topcon/topconread.cpp#L318
+scan_param_04 = Struct(
+    "unknown" / Array(3, Int32un),
+    "x_width_mm" / Float64n,
+    "y_width_mm" / Float64n,
+    "z_resolution_um" / Float64n
 )
