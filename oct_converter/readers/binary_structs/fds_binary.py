@@ -1,4 +1,4 @@
-from construct import Int32un, PaddedString, Struct, Array, Float64n
+from construct import Array, Float64n, Int32un, PaddedString, Struct
 
 header = Struct(
     "FOCT" / PaddedString(4, "ascii"),
@@ -29,5 +29,5 @@ scan_param_04 = Struct(
     "unknown" / Array(3, Int32un),
     "x_width_mm" / Float64n,
     "y_width_mm" / Float64n,
-    "z_resolution_um" / Float64n
+    "z_resolution_um" / Float64n,
 )
