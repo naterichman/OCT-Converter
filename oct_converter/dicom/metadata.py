@@ -1,6 +1,7 @@
 import dataclasses
 import enum
 import datetime
+import typing as t
 
 class OPTAcquisitionDevice(enum.Enum):
 	"""OPT Acquisition Device enumeration.
@@ -55,32 +56,67 @@ class OCTDetectorType(enum.Enum):
 
 
 @dataclasses.dataclass
-class DicomMetadata():
+class PatientMeta():
 	# Patient Info
-	first_name: str
-	last_name: str
-	patient_id: str
-	patient_sex: str
-	patient_dob: datetime.datetime
+	first_name: str = ''
+	last_name: str = ''
+	patient_id: str = ''
+	patient_sex: str = ''
+	patient_dob: t.Optional[datetime.datetime] = None
 
+
+@dataclasses.dataclass
+class SeriesMeta():
 	# Study and Series
-	study_id: str
-	series_id: str
-	laterality: str
-	acquisition_date: datetime.datetime
-
-	# Manufacturer info
-	manufacturer: str
-	manufacturer_model: str = 'unknown'
-	device_serial: str = 'unknown'
-	software_version: str = 'unknown'
-	opt_acquisition_device: OPTAcquisitionDevice = OPTAcquisitionDevice.Unspecified
-	detector_type: OCTDetectorType = OCTDetectorType.Unknown
-
+	study_id: str = ''
+	series_id: str = ''
+	laterality: str = ''
+	acquisition_date: t.Optional[datetime.datetime] = None
 	# Anatomy
 	opt_anatomy: OPTAnatomyStructure = OPTAnatomyStructure.Unspecified
 
-	# Image params
-	pixel_spacing = [1.0, 1.0]
-	slice_thickness = 1.0
-	image_orientation = [1, 0, 0, 0 , 1, 0]
+
+@dataclasses.dataclass
+class ManufacturerMeta():
+	# Manufacturer info
+	manufacturer: str = ''
+	manufacturer_model: str = 'unknown'
+	device_serial: str = 'unknown'
+	software_version: str = 'unknown'
+
+
+@dataclasses.dataclass
+class ImageGeometry():
+	# Image geometry info
+	pixel_spacing: t.List[float] = [1.0, 1.0]
+	slice_thickness: float = 1.0
+	image_orientation: t.List[float] = [1, 0, 0, 0 , 1, 0]
+
+
+@dataclasses.dataclass
+class OCTImageParams():
+	# PS3.3 C.8.17.9
+	opt_acquisition_device: OPTAcquisitionDevice = OPTAcquisitionDevice.Unspecified
+	DetectorType: OCTDetectorType = OCTDetectorType.Unknown
+	IlluminationWaveLength: t.Optional[float] = None
+	IlluminationPower: t.Optional[float] = None
+	IlluminationBandwidth: t.Optional[float] = None
+	DepthSpatialResolution: t.Optional[float] = None
+	MaximumDepthDistortion: t.Optional[float] = None
+	AlongscanSpatialResolution: t.Optional[float] = None
+	MaximumAlongscanDistortion: t.Optional[float] = None
+	AcrossscanSpatialResolution: t.Optional[float] = None
+	MaximumAcrossscanDistortion: t.Optional[float] = None
+
+	# NOTE: Could eventually include C.8.17.8 Acquisition Params.
+
+
+@dataclasses.dataclass
+class DicomMetadata():
+	patient_info: PatientMeta
+	series_info: SeriesMeta
+	manufacturer_info: ManufacturerMeta
+
+	image_geometry: ImageGeometry
+	oct_image_params: OCTImageParams
+

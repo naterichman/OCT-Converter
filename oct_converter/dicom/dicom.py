@@ -8,9 +8,8 @@ from pathlib import Path
 import typing as t
 import tempfile
 from datetime import datetime
+import uuid
 
-
-OPT_DETECTOR_TYPE = ["CCD", "CMOS", "PHOTO", "INT"]
 
 def opt_base_dicom() -> t.Tuple[Path, Dataset]:
 	suffix = '.dcm'
@@ -32,42 +31,49 @@ def opt_base_dicom() -> t.Tuple[Path, Dataset]:
 
 def populate_patient_info(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	# Patient Module PS3.3 C.7.1.1
-	ds.PatientName = f"{meta.last_name}^{meta.first_name}"
-	ds.PatientID = meta.patient_id
-	ds.PatientSex = meta.patient_sex
-	ds.PatientBirthDate = meta.patient_dob.strftime('%Y%m%d')
+	ds.PatientName = f"{meta.patient_info.last_name}^{meta.patient_info.first_name}"
+	ds.PatientID = meta.patient_info.patient_id
+	ds.PatientSex = meta.patient_info.patient_sex
+	ds.PatientBirthDate = (
+		meta.patient_info.patient_dob.strftime('%Y%m%d') if meta.patient_info.patient_dob
+	)
 	return ds
 
 
 def populate_manufacturer_info(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	# General and enhanced equipment module PS3.3 C.7.5.1, PS3.3 C.7.5.2
-	ds.Manufacturer = meta.manufacturer
-	ds.ManufacturerModelName = meta.manufacturer_model
-	ds.DeviceSerialNumber = meta.device_serial
-	ds.SoftwareVersions = meta.software_version
+	ds.Manufacturer = meta.manufacturer_info.manufacturer
+	ds.ManufacturerModelName = meta.manufacturer_info.manufacturer_model
+	ds.DeviceSerialNumber = meta.manufacturer_info.device_serial
+	ds.SoftwareVersions = meta.manufacturer_info.software_version
 
 	# OPT parameter module PS3.3 C.8.17.9
-	# TODO: support other device types and load from manufacturer
-	cd, cv, cm = meta.opt_acquisition_device.value
+	cd, cv, cm = meta.oct_image_params.opt_acquisition_device.value
 	ds.AcquisitionDeviceTypeCodeSequence = [Dataset()]
 	ds.AcquisitionDeviceTypeCodeSequence[0].CodeValue = cv
 	ds.AcquisitionDeviceTypeCodeSequence[0].CodingSchemeDesignator = cd
 	ds.AcquisitionDeviceTypeCodeSequence[0].CodeMeaning = cm
-	ds.DetectorType = meta.detector_type.value
+	ds.DetectorType = meta.oct_image_params.DetectorType.value
 	return ds
 
 
 def populate_opt_series(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	# General study module PS3.3 C.7.2.1
 	# Deterministic StudyInstanceUID based on study ID
-	ds.StudyInstanceUID = generate_uid(entropy_srcs=[meta.study_id])
+	ds.StudyInstanceUID = generate_uid(entropy_srcs=[
+		uuid.uuid4(),
+		meta.series_info.study_id
+	])
 
 	# General series module PS3.3 C.7.3.1
-	ds.SeriesInstanceUID = generate_uid(entropy_srcs=[meta.series_id])
-	ds.Laterality = meta.laterality
+	ds.SeriesInstanceUID = generate_uid(entropy_srcs=[
+		uuid.uuid4(),
+		meta.series_info.series_id
+	])
+	ds.Laterality = meta.series_info.laterality
 	# Ophthalmic Tomography Series PS3.3 C.8.17.6
 	ds.Modality = 'OPT'
-	ds.SeriesNumber = int(meta.series_id)
+	ds.SeriesNumber = int(meta.series_info.series_id)
 
 	# SOP Common module PS3.3 C.12.1
 	ds.SOPClassUID = OphthalmicTomographyImageStorage
@@ -77,8 +83,8 @@ def populate_opt_series(ds: Dataset, meta: DicomMetadata) -> Dataset:
 
 def populate_ocular_region(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	# Ocular region imaged module PS3.3 C.8.17.5
-	cd, cv, cm = meta.opt_anatomy.value
-	ds.ImageLaterality = meta.laterality
+	cd, cv, cm = meta.series_info.opt_anatomy.value
+	ds.ImageLaterality = meta.series_info.laterality
 	ds.AnatomicRegionSequence = [Dataset()]
 	ds.AnatomicRegionSequence[0].CodeValue = cv
 	ds.AnatomicRegionSequence[0].CodingSchemeDesignator = cd
@@ -92,14 +98,14 @@ def opt_shared_functional_groups(ds: Dataset, meta: DicomMetadata) -> Dataset:
 	# Frame anatomy PS3.3 C.7.6.16.2.8
 	shared_ds[0].FrameAnatomySequence = [Dataset()]
 	shared_ds[0].FrameAnatomySequence[0] = ds.AnatomicRegionSequence[0].copy()	
-	shared_ds[0].FrameAnatomySequence[0].FrameLaterality = meta.laterality
+	shared_ds[0].FrameAnatomySequence[0].FrameLaterality = meta.series_info.laterality
 	# Pixel Measures PS3.3 C.7.6.16.2.1 
 	shared_ds[0].PixelMeasuresSequence = [Dataset()]
-	shared_ds[0].PixelMeasuresSequence[0].PixelSpacing = meta.pixel_spacing
-	shared_ds[0].PixelMeasuresSequence[0].SliceThickness = meta.slice_thickness
+	shared_ds[0].PixelMeasuresSequence[0].PixelSpacing = meta.image_geometry.pixel_spacing
+	shared_ds[0].PixelMeasuresSequence[0].SliceThickness = meta.image_geometry.slice_thickness
 	# Plane Orientation PS3.3 C.7.6.16.2.4
 	shared_ds[0].PlaneOrientationSequence = [Dataset()]
-	shared_ds[0].PlaneOrientationSequence[0].ImageOrientationPatient = meta.image_orientation
+	shared_ds[0].PlaneOrientationSequence[0].ImageOrientationPatient = meta.image_geometry.image_orientation
 	ds.SharedFunctionalGroupsSequence = shared_ds
 	return ds
 
@@ -120,7 +126,9 @@ def write_opt_dicom(
 	# OPT Image Module PS3.3 C.8.17.7
 	ds.ImageType = ['DERIVED', 'SECONDARY']
 	ds.SamplesPerPixel = 1
-	ds.AcquisitionDateTime = meta.acquisition_date.strftime('%Y%m%d%H%M%S.%f')
+	ds.AcquisitionDateTime = (
+		meta.series_info.acquisition_date.strftime('%Y%m%d%H%M%S.%f') if meta.series_info.acquisition_date
+	)
 	ds.AcquisitionNumber = 1
 	ds.PhotometricInterpretation = 'MONOCHROME2'
 	# Unsigned integer
@@ -150,7 +158,7 @@ def write_opt_dicom(
 		# Per Frame Functional Groups
 		frame_fgs = Dataset()
 		frame_fgs.PlanePositionSequence = [Dataset()]
-		ipp = [0, 0, i*meta.slice_thickness]
+		ipp = [0, 0, i*meta.image_geometry.slice_thickness]
 		frame_fgs.PlanePositionSequence[0].ImagePositionPatient = ipp
 		frame_fgs.FrameContentSequence = [Dataset()]
 		frame_fgs.FrameContentSequence[0].InStackPositionNumber = i + 1
