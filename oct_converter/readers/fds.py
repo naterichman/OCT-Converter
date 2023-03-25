@@ -79,17 +79,17 @@ class FDS(object):
             pixel_spacing = None
             if chunk_loc:
                 f.seek(chunk_loc)
-                scan_params = fds_binary.scan_param_04.parse(f.read(chunk_size))
-                # NOTE: this will need reordering for dicom pixel spacing and 
+                scan_params = fds_binary.param_scan_04_header.parse(f.read(chunk_size))
+                # NOTE: this will need reordering for dicom pixel spacing and
                 # image orientation/position patient as well as possibly for nifti
                 # depending on what x,y,z means here.
 
                 # In either nifti/dicom coordinate systems, the x-y plan in raw space
                 # corresponds to the x-z plane, just depends which direction.
                 pixel_spacing = [
-                    scan_params.x_width_mm / oct_header.width,
-                    scan_params.y_width_mm / oct_header.height,
-                    scan_params.z_resolution_um / 1000,
+                    scan_params.x_dimension_mm / oct_header.height,  # Left/Right
+                    scan_params.z_resolution_um / 1000,  # Up/Down
+                    scan_params.y_dimension_mm / oct_header.width,  # Depth
                 ]
 
         oct_volume = OCTVolumeWithMetaData(

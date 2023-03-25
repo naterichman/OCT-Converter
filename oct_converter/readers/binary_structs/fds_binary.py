@@ -25,9 +25,9 @@ fundus_header = Struct(
 )
 
 # ref: https://github.com/neurodial/LibOctData/blob/master/octdata/import/topcon/topconread.cpp#L318
-scan_param_04 = Struct(
+param_scan_04_header = Struct(
     "unknown" / Array(3, Int32un),
-    "x_width_mm" / Float64n,
-    "y_width_mm" / Float64n,
+    "x_dimension_mm" / Float64n,
+    "y_dimension_mm" / Float64n,
     "z_resolution_um" / Float64n
 )
