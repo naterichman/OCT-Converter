@@ -75,7 +75,7 @@ class FDS(object):
                 oct_header.width, oct_header.height, oct_header.number_slices, order="F"
             )
             volume = np.transpose(volume, [1, 0, 2])
-            chunk_loc, chunk_size = self.chunk_dict.get(b'@PARAM_SCAN_04', (None, None))
+            chunk_loc, chunk_size = self.chunk_dict.get(b"@PARAM_SCAN_04", (None, None))
             pixel_spacing = None
             if chunk_loc:
                 f.seek(chunk_loc)
@@ -94,7 +94,7 @@ class FDS(object):
 
         oct_volume = OCTVolumeWithMetaData(
             [volume[:, :, i] for i in range(volume.shape[2])],
-            pixel_spacing=pixel_spacing
+            pixel_spacing=pixel_spacing,
         )
         return oct_volume
 

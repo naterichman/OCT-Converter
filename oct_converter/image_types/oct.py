@@ -45,7 +45,7 @@ class OCTVolumeWithMetaData(object):
         acquisition_date=None,
         laterality=None,
         contours=None,
-        pixel_spacing: t.Optional[t.List[float]] = None
+        pixel_spacing: t.Optional[t.List[float]] = None,
     ):
         # image
         self.volume = volume
@@ -66,7 +66,6 @@ class OCTVolumeWithMetaData(object):
 
         # geom data
         self.pixel_spacing = pixel_spacing
-
 
     def peek(self, rows=5, cols=5, filepath=None, show_contours=False):
         """Plots a montage of the OCT volume. Optionally saves the plot if a filepath is provided.
