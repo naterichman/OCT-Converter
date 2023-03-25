@@ -110,7 +110,7 @@ param_scan_04_header = Struct(
     "unknown" / Int16un[6],
     "x_dimension_mm" / Float64n,
     "y_dimension_mm" / Float64n,
-    "z_resolution_um" / Float64n
+    "z_resolution_um" / Float64n,
 )
 
 img_trc_02_header = Struct(
